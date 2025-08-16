@@ -13,6 +13,11 @@ RUN apt-get update && apt-get install -y \
     nginx \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql
 
+# --- THIS IS THE FIX ---
+# Copy a production-ready PHP-FPM config into the container
+COPY --from=php:8.2-fpm /usr/local/etc/php-fpm.d/www.conf.default /usr/local/etc/php-fpm.d/www.conf
+# --- END OF FIX ---
+
 # Step 3: Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -48,6 +53,5 @@ RUN php artisan migrate --force
 # Expose port 80 for Nginx
 EXPOSE 80
 
-# This is the new start command. It's more complex because it needs to start two services.
-# It starts php-fpm in the background, then starts nginx in the foreground.
+# Start php-fpm in the background, then start nginx in the foreground
 CMD bash -c "php-fpm & exec nginx -g 'daemon off;'"
