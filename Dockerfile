@@ -38,9 +38,6 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 # Build the frontend assets with npm
 RUN npm install && npm run build
 
-# Run database migrations
-RUN php artisan migrate --force
-
 
 # Run database migrations as part of the build
 RUN php artisan migrate --force
