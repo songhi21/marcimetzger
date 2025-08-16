@@ -10,11 +10,7 @@ RUN apt-get update && apt-get install -y \
     zip \
     unzip \
     libpq-dev \
-    nginx \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql
-
-# Copy a production-ready PHP-FPM config
-COPY --from=php:8.2-fpm /usr/local/etc/php-fpm.d/www.conf.default /usr/local/etc/php-fpm.d/www.conf
 
 # Step 3: Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -32,16 +28,12 @@ RUN composer install --no-dev --no-interaction --no-progress --no-scripts --opti
 # Now, copy the rest of the application files
 COPY . .
 
-# Copy the Nginx configuration file
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-
-# Copy and prepare the startup script
-COPY docker/start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/start.sh
-
 # Manually run composer scripts
 RUN composer dump-autoload --optimize && \
     php artisan package:discover --ansi
+
+# Set the correct permissions
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Build the frontend assets
 RUN npm install && npm run build
@@ -49,8 +41,8 @@ RUN npm install && npm run build
 # Run database migrations
 RUN php artisan migrate --force
 
-# Expose port 80 for Nginx
-EXPOSE 80
+# Expose the port Laravel will run on
+EXPOSE 8000
 
-# Use the startup script as the final command
-CMD ["start.sh"]
+# Set the final start command
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
