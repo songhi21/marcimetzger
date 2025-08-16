@@ -4,12 +4,13 @@ FROM php:8.2-fpm
 # Set the working directory
 WORKDIR /var/www/html
 
-# Step 2: Install system dependencies, including the crucial PostgreSQL development library
+# Step 2: Install system dependencies, including Nginx and postgresql dev library
 RUN apt-get update && apt-get install -y \
     git \
     zip \
     unzip \
     libpq-dev \
+    nginx \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql
 
 # Step 3: Install Composer
@@ -22,26 +23,31 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Copy only composer files first for caching
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies (without running scripts yet)
+# Install PHP dependencies
 RUN composer install --no-dev --no-interaction --no-progress --no-scripts --optimize-autoloader
 
 # Now, copy the rest of the application files
 COPY . .
 
-# Manually run composer scripts now that the app files are present
+# Copy the Nginx configuration file into the container
+COPY docker/nginx.conf /etc/nginx/sites-available/default
+
+# Manually run composer scripts
 RUN composer dump-autoload --optimize && \
     php artisan package:discover --ansi
 
-# Set the correct permissions for Laravel
+# Set the correct permissions
 RUN chown -R www-data:www-data storage bootstrap/cache
 
-# Build the frontend assets with npm
+# Build the frontend assets
 RUN npm install && npm run build
 
+# Run database migrations
+RUN php artisan migrate --force
 
+# Expose port 80 for Nginx
+EXPOSE 80
 
-# Expose the port Laravel will run on
-EXPOSE 8000
-
-# Set the final start command
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# This is the new start command. It's more complex because it needs to start two services.
+# It starts php-fpm in the background, then starts nginx in the foreground.
+CMD bash -c "php-fpm & exec nginx -g 'daemon off;'"
