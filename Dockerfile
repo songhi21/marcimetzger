@@ -4,7 +4,7 @@ FROM php:8.2-fpm
 # Set the working directory
 WORKDIR /var/www/html
 
-# Step 2: Install system dependencies, including Nginx and postgresql dev library
+# Step 2: Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     zip \
@@ -13,10 +13,8 @@ RUN apt-get update && apt-get install -y \
     nginx \
     && docker-php-ext-install pdo pdo_mysql pdo_pgsql
 
-# --- THIS IS THE FIX ---
 # Copy a production-ready PHP-FPM config into the container
 COPY --from=php:8.2-fpm /usr/local/etc/php-fpm.d/www.conf.default /usr/local/etc/php-fpm.d/www.conf
-# --- END OF FIX ---
 
 # Step 3: Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -41,8 +39,14 @@ COPY docker/nginx.conf /etc/nginx/sites-available/default
 RUN composer dump-autoload --optimize && \
     php artisan package:discover --ansi
 
-# Set the correct permissions
-RUN chown -R www-data:www-data storage bootstrap/cache
+# --- PERMISSIONS FIX START ---
+# Set the correct ownership for all files
+RUN chown -R www-data:www-data /var/www/html
+
+# This command ensures the PHP-FPM socket is writable by Nginx
+RUN sed -i 's/listen.owner = www-data/listen.owner = nginx/' /usr/local/etc/php-fpm.d/www.conf && \
+    sed -i 's/listen.group = www-data/listen.group = nginx/' /usr/local/etc/php-fpm.d/www.conf
+# --- PERMISSIONS FIX END ---
 
 # Build the frontend assets
 RUN npm install && npm run build
