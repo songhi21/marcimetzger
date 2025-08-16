@@ -41,6 +41,7 @@ RUN chown -R www-data:www-data storage bootstrap/cache
 
 # Build the frontend assets with npm
 RUN npm install && npm run build
+RUN php artisan migrate --force
 
 # Expose the port Laravel will run on
 EXPOSE 8000
